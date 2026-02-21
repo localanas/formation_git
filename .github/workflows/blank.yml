@@ -1,26 +1,21 @@
-name: SSH Test Azure VM
+name: Test SSH Azure VM
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # Permet de lancer manuellement via le bouton "Run workflow"
 
 jobs:
-  ssh:
+  ssh-test:
     runs-on: ubuntu-latest
-    environment: Production   # <-- important
+    environment: Production  # <-- nom exact de ton environment où le secret SSH_KEY est défini
 
     steps:
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}  # exact nom du secret
+          ssh-private-key: ${{ secrets.SSH_KEY }}  # utilise ton secret SSH_KEY
 
-      - name: Test SSH Connection
+      - name: Test SSH connection
         run: |
-          SERVER_IP="4.233.147.103"
-          USER="anasnadi"
-
-          ssh -o StrictHostKeyChecking=no $USER@$SERVER_IP bash -c "
-            echo '✅ SSH depuis GitHub Actions OK'
-            hostname
-            whoami
-          "
+          VM_USER="anasnadi"
+          VM_IP="4.233.147.103"
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP "echo '✅ Connexion SSH OK'; hostname; whoami"
