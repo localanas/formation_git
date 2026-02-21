@@ -1,0 +1,20 @@
+name: SSH Test Azure VM
+
+on:
+  workflow_dispatch:   # permet d’exécuter via le bouton "Run workflow"
+
+jobs:
+  ssh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 4.233.147.103
+          username: anasnadi
+          key: ${{ secrets.SSH_KEY }}   # utilise ton secret
+          script: |
+            echo "✅ SSH from GitHub OK"
+            hostname
+            whoami
