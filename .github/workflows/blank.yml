@@ -9,51 +9,46 @@ jobs:
     environment: ssh_key   # ton environment GitHub
 
     steps:
-      # 🔑 Démarrage de l'agent SSH
+      # Étape 1 : Démarrer l'agent SSH
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      # 🚀 Déploiement sur la VM
+      # Étape 2 : Déploiement sur la VM
       - name: Deploy on Azure VM
         run: |
           VM_USER="anasnadi"
           VM_IP="4.233.147.103"
-          PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"   # 🔥 à adapter
-          BRANCH="main"                                                    # 🔥 branche à déployer
+          PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'EOF'
-            set -e  # stop si erreur
+          ssh -t -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+            set -e
 
-            echo "✅ Connecté au serveur"
+            echo '✅ Connecté au serveur'
 
-            cd '"$PROJECT_DIR"'
+            # Vérifier que le dossier existe
+            if [ ! -d '$PROJECT_DIR' ]; then
+              echo '❌ Erreur : le dossier $PROJECT_DIR n'existe pas !'
+              exit 1
+            fi
 
-            echo "📥 Mise à jour du dépôt Git"
-            git fetch origin
-            git reset --hard origin/'"$BRANCH"'
-            git clean -fd
+            cd '$PROJECT_DIR'
+            echo '📥 Git pull'
+            git fetch --all
+            git reset --hard origin/main
 
-            echo "📦 Installation des dépendances Composer"
+            echo '📦 Composer install'
             composer install --no-interaction --prefer-dist --optimize-autoloader
 
-            echo "🧹 Nettoyage cache Laravel"
-            php artisan config:clear
-            php artisan cache:clear
-            php artisan view:clear
-            php artisan route:clear
+            echo '🧹 Laravel cache clear'
             php artisan optimize:clear
 
-            echo "⚡ Optimisation Laravel"
+            echo '⚡ Laravel optimize'
             php artisan optimize
 
-            echo "🔐 Permissions correctes"
-            sudo chown -R www-data:www-data storage bootstrap/cache
-            sudo chmod -R 775 storage bootstrap/cache
+            echo '🔁 Restart PHP (si service existe)'
+            sudo systemctl restart php8.2-fpm || echo '⚠️ PHP service not found, skipped'
 
-            echo "🔁 Redémarrage PHP-FPM"
-            sudo systemctl restart php8.2-fpm || true
-
-            echo "✅ Déploiement terminé"
-          EOF
+            echo '✅ Déploiement terminé avec succès'
+          "
