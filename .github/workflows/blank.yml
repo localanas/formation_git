@@ -1,4 +1,4 @@
-name: Deploy Laravel (SSH)
+name: Deploy Laravel Simple
 
 on:
   workflow_dispatch:
@@ -9,45 +9,51 @@ jobs:
     environment: ssh_key
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      - name: Deploy on Azure VM
+      - name: Deploy on VM
         run: |
           VM_USER="anasnadi"
           VM_IP="4.233.147.103"
           PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"
 
-          ssh -t -o StrictHostKeyChecking=no $VM_USER@$VM_IP bash << 'EOF'
+          echo "🔑 Connecting to $VM_USER@$VM_IP"
+
+          ssh -t -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
             set -e
 
-            echo "✅ Connecté au serveur"
+            echo '✅ Connecté au serveur'
 
             # Vérifier que le dossier existe
-            if [ ! -d "$PROJECT_DIR" ]; then
-              echo "❌ Erreur : le dossier $PROJECT_DIR n'existe pas !"
+            if [ ! -d $PROJECT_DIR ]; then
+              echo '❌ Erreur : dossier $PROJECT_DIR introuvable'
               exit 1
             fi
 
-            cd "$PROJECT_DIR"
+            cd $PROJECT_DIR
+            echo '📂 Current directory:' \$(pwd)
 
-            echo "📥 Git pull"
+            echo '📥 Git pull'
             git fetch --all
             git reset --hard origin/main
 
-            echo "📦 Composer install"
+            echo '📦 Composer install'
             composer install --no-interaction --prefer-dist --optimize-autoloader
 
-            echo "🧹 Laravel cache clear"
+            echo '🧹 Laravel cache clear'
             php artisan optimize:clear
 
-            echo "⚡ Laravel optimize"
+            echo '⚡ Laravel optimize'
             php artisan optimize
 
-            echo "🔁 Restart PHP (si service existe)"
-            sudo systemctl restart php8.2-fpm || echo "⚠️ PHP service not found, skipped"
+            echo '🔁 Restart PHP-FPM'
+            sudo systemctl restart php8.2-fpm || echo '⚠️ PHP service not found, skipped'
 
-            echo "✅ Déploiement terminé avec succès"
-EOF
+            echo '✅ Déploiement terminé'
+          "
