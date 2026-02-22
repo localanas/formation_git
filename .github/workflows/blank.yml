@@ -1,21 +1,35 @@
 name: Test SSH Azure VM
 
 on:
-  workflow_dispatch:   # Permet de lancer manuellement via le bouton "Run workflow"
+  workflow_dispatch:
 
 jobs:
   ssh-test:
     runs-on: ubuntu-latest
-    environment: Production  # <-- nom exact de ton environment où le secret SSH_KEY est défini
+    environment: ssh_key
 
     steps:
+      - name: Debug Environment
+        run: |
+          echo "Environment utilisé = ${{ job.environment }}"
+
+      - name: Debug SSH_KEY presence
+        run: |
+          if [ -z "${{ secrets.SSH_KEY }}" ]; then
+            echo "❌ SSH_KEY est VIDE"
+          else
+            echo "✅ SSH_KEY est PRESENT"
+          fi
+
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}  # utilise ton secret SSH_KEY
+          ssh-private-key: ${{ secrets.SSH_KEY }}
 
       - name: Test SSH connection
         run: |
-          VM_USER="anasnadi"
-          VM_IP="4.233.147.103"
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP "echo '✅ Connexion SSH OK'; hostname; whoami"
+          ssh -o StrictHostKeyChecking=no anasnadi@4.233.147.103 "
+            echo '✅ Connexion SSH OK';
+            hostname;
+            whoami
+          "
