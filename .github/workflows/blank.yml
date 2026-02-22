@@ -9,37 +9,51 @@ jobs:
     environment: ssh_key   # ton environment GitHub
 
     steps:
+      # 🔑 Démarrage de l'agent SSH
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
+      # 🚀 Déploiement sur la VM
       - name: Deploy on Azure VM
         run: |
           VM_USER="anasnadi"
           VM_IP="4.233.147.103"
-          PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"   # 🔥 A MODIFIER
+          PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"   # 🔥 à adapter
+          BRANCH="main"                                                    # 🔥 branche à déployer
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
-            set -e
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'EOF'
+            set -e  # stop si erreur
 
-            echo '✅ Connecté au serveur'
-            cd $PROJECT_DIR
+            echo "✅ Connecté au serveur"
 
-            echo '📥 Git pull'
-            git pull
+            cd '"$PROJECT_DIR"'
 
-            echo '📦 Composer install'
+            echo "📥 Mise à jour du dépôt Git"
+            git fetch origin
+            git reset --hard origin/'"$BRANCH"'
+            git clean -fd
+
+            echo "📦 Installation des dépendances Composer"
             composer install --no-interaction --prefer-dist --optimize-autoloader
 
-            echo '🧹 Laravel cache clear'
+            echo "🧹 Nettoyage cache Laravel"
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan view:clear
+            php artisan route:clear
             php artisan optimize:clear
 
-            echo '⚡ Laravel optimize'
+            echo "⚡ Optimisation Laravel"
             php artisan optimize
 
-            echo '🔁 Restart PHP (si existe)'
+            echo "🔐 Permissions correctes"
+            sudo chown -R www-data:www-data storage bootstrap/cache
+            sudo chmod -R 775 storage bootstrap/cache
+
+            echo "🔁 Redémarrage PHP-FPM"
             sudo systemctl restart php8.2-fpm || true
 
-            echo '✅ Déploiement terminé'
-          "
+            echo "✅ Déploiement terminé"
+          EOF
