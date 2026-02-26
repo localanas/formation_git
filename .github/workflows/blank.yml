@@ -24,7 +24,7 @@ jobs:
         run: |
           VM_USER="anasnadi"
           VM_IP="4.233.147.103"
-          PROJECT_DIR="/home/anasnadi/git/project/formation_git/laravel"
+          PROJECT_DIR="/home/anasnadi/formation/anass_nadi/formation_git/demo_laravel"
 
           echo "🔑 Connecting to $VM_USER@$VM_IP"
 
