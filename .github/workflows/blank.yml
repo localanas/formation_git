@@ -2,6 +2,15 @@ name: Deploy Laravel Full CI/CD
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Choisir l’environnement
+        required: true
+        default: preProd
+        type: choice
+        options:
+          - preProd
+          - Prod
 
 jobs:
   deploy:
@@ -21,72 +30,75 @@ jobs:
 
       # 🔹 3️⃣ Deploy + tests + pre-commit
       - name: Deploy on VM
+        env:
+          ENV: ${{ github.event.inputs.environment }}
         run: |
           VM_USER="anasnadi"
-          VM_IP="4.233.147.103"
           PROJECT_DIR="/home/anasnadi/formation/anass_nadi/formation_git/demo_laravel"
 
-          echo "🔑 Connecting to $VM_USER@$VM_IP"
+          # 🔹 Définir le serveur et la branche selon l'environnement
+          if [ "$ENV" = "Prod" ]; then
+            VM_IP="4.233.147.103"
+            BRANCH="main"
+          else
+            VM_IP="4.233.147.103"
+            BRANCH="develop"
+          fi
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP bash << 'ENDSSH'
+          echo "🔑 Connecting to $VM_USER@$VM_IP (branch: $BRANCH)"
+
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
             set -e  # Stop workflow si une commande échoue
 
-            echo "✅ Connecté au serveur"
+            echo '✅ Connecté au serveur'
 
-            # 🔹 Aller dans le projet
-            if [ ! -d "$PROJECT_DIR" ]; then
-              echo "❌ Dossier introuvable: $PROJECT_DIR"
+            if [ ! -d '$PROJECT_DIR' ]; then
+              echo '❌ Dossier introuvable: $PROJECT_DIR'
               exit 1
             fi
-            cd "$PROJECT_DIR"
-            echo "📂 Current directory: $(pwd)"
+
+            cd '$PROJECT_DIR'
+            echo '📂 Current directory:' \$(pwd)
 
             # 🔹 Activer le pre-commit hook
-            if [ -f ".git/hooks/pre-commit" ]; then
+            if [ -f '.git/hooks/pre-commit' ]; then
               chmod +x .git/hooks/pre-commit
-              echo "🔧 Pre-commit hook activé"
+              echo '🔧 Pre-commit hook activé'
+              echo '⚡ Running pre-commit hook'
+              .git/hooks/pre-commit || { echo '❌ Pre-commit failed'; exit 1; }
             fi
 
             # 🔹 Vérifier PHP et Composer
-            echo "🔎 PHP version"
+            echo '🔎 PHP version'
             php -v
-            echo "🔎 Composer version"
+            echo '🔎 Composer version'
             composer -V
 
             # 🔹 Pull du code
-            echo "📥 Git pull"
+            echo '📥 Git fetch & reset'
             git fetch --all
-            git reset --hard origin/main
+            git reset --hard origin/$BRANCH
 
             # 🔹 Installer les dépendances
-            echo "📦 Composer install"
-            COMPOSER_MEMORY_LIMIT=-1 composer install \
-              --no-interaction \
-              --prefer-dist \
-              --optimize-autoloader
-
-            # 🔹 Exécuter le pre-commit hook
-            if [ -f ".git/hooks/pre-commit" ]; then
-              echo "⚡ Running pre-commit hook"
-              .git/hooks/pre-commit || { echo "❌ Pre-commit failed"; exit 1; }
-            fi
+            echo '📦 Composer install'
+            COMPOSER_MEMORY_LIMIT=-1 composer install --no-interaction --prefer-dist --optimize-autoloader
 
             # 🔹 Lancer les tests Laravel
-            echo "🧪 Running Laravel tests"
-            php artisan test || { echo "❌ Tests échoués"; exit 1; }
+            echo '🧪 Running Laravel tests'
+            php artisan test || { echo '❌ Tests échoués'; exit 1; }
 
             # 🔹 Migrer la base
-            echo "🗄️ Laravel migrate"
+            echo '🗄️ Laravel migrate'
             php artisan migrate --force
 
             # 🔹 Clear & optimize
-            echo "🧹 Clear & optimize"
+            echo '🧹 Clear & optimize'
             php artisan optimize:clear
             php artisan optimize
 
             # 🔹 Redémarrer PHP-FPM
-            echo "🔁 Restart PHP-FPM"
-            sudo systemctl restart php8.3-fpm || echo "⚠️ PHP-FPM not restarted"
+            echo '🔁 Restart PHP-FPM'
+            sudo systemctl restart php8.3-fpm || echo '⚠️ PHP-FPM not restarted'
 
-            echo "✅ Déploiement terminé"
-ENDSSH
+            echo '✅ Déploiement terminé'
+          "
