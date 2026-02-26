@@ -19,7 +19,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      # 🔹 3️⃣ Deploy on VM
+      # 🔹 3️⃣ Deploy + tests + pre-commit
       - name: Deploy on VM
         run: |
           VM_USER="anasnadi"
@@ -28,7 +28,7 @@ jobs:
 
           echo "🔑 Connecting to $VM_USER@$VM_IP"
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'EOF'
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'ENDSSH'
             set -e  # Stop workflow si une commande échoue
 
             echo "✅ Connecté au serveur"
@@ -40,6 +40,12 @@ jobs:
             fi
             cd "$PROJECT_DIR"
             echo "📂 Current directory: $(pwd)"
+
+            # 🔹 Activer le pre-commit hook
+            if [ -f ".git/hooks/pre-commit" ]; then
+              chmod +x .git/hooks/pre-commit
+              echo "🔧 Pre-commit hook activé"
+            fi
 
             # 🔹 Vérifier PHP et Composer
             echo "🔎 PHP version"
@@ -59,16 +65,15 @@ jobs:
               --prefer-dist \
               --optimize-autoloader
 
-            # 🔹 Lancer le pre-commit hook via Composer
+            # 🔹 Exécuter le pre-commit hook
             if [ -f ".git/hooks/pre-commit" ]; then
-              chmod +x .git/hooks/pre-commit
-              echo "🔧 Lancer le pre-commit hook via Composer"
-              composer run pre-commit || { echo "❌ Pre-commit hook échoué, arrêt du déploiement"; exit 1; }
+              echo "⚡ Running pre-commit hook"
+              .git/hooks/pre-commit || { echo "❌ Pre-commit failed"; exit 1; }
             fi
 
             # 🔹 Lancer les tests Laravel
             echo "🧪 Running Laravel tests"
-            php artisan test || { echo "❌ Tests Laravel échoués, arrêt du déploiement"; exit 1; }
+            php artisan test || { echo "❌ Tests échoués"; exit 1; }
 
             # 🔹 Migrer la base
             echo "🗄️ Laravel migrate"
@@ -84,4 +89,4 @@ jobs:
             sudo systemctl restart php8.3-fpm || echo "⚠️ PHP-FPM not restarted"
 
             echo "✅ Déploiement terminé"
-EOF
+ENDSSH
