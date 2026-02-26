@@ -9,17 +9,17 @@ jobs:
     environment: ssh_key
 
     steps:
-      # 🔹 Étape 1 : Récupérer le code du repo
+      # 🔹 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 🔹 Étape 2 : Démarrer l'agent SSH avec la clé privée
+      # 🔹 2️⃣ SSH Agent
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      # 🔹 Étape 3 : Déploiement sur la VM
+      # 🔹 3️⃣ Deploy
       - name: Deploy on VM
         run: |
           VM_USER="anasnadi"
@@ -28,41 +28,44 @@ jobs:
 
           echo "🔑 Connecting to $VM_USER@$VM_IP"
 
-          ssh -t -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
-            set -e  # Arrêter en cas d'erreur
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << EOF
+            set -e
 
-            echo '✅ Connecté au serveur'
+            echo "✅ Connecté au serveur"
 
-            # 🔹 Vérifier que le dossier existe
-            if [ ! -d $PROJECT_DIR ]; then
-              echo '❌ Erreur : dossier $PROJECT_DIR introuvable'
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "❌ Dossier introuvable: $PROJECT_DIR"
               exit 1
             fi
 
             cd $PROJECT_DIR
-            echo '📂 Current directory:' \$(pwd)
+            echo "📂 Current directory: \$(pwd)"
 
-            # 🔹 Vérifier PHP et Composer
-            php -v || { echo '❌ PHP non trouvé'; exit 1; }
-            composer -V || { echo '❌ Composer non trouvé'; exit 1; }
+            echo "🔎 PHP version"
+            php -v
 
-            # 🔹 Pull du code Git
-            echo '📥 Git pull'
+            echo "🔎 Composer version"
+            composer -V
+
+            echo "📥 Git pull"
             git fetch --all
             git reset --hard origin/main
 
-            # 🔹 Installer les dépendances
-            echo '📦 Composer install'
-            composer install --no-interaction --prefer-dist --optimize-autoloader --quiet
+            echo "📦 Composer install"
+            COMPOSER_MEMORY_LIMIT=-1 composer install \
+              --no-interaction \
+              --prefer-dist \
+              --optimize-autoloader
 
-            # 🔹 Nettoyer et optimiser Laravel
-            echo '🧹 Laravel cache clear & optimize'
+            echo "🗄️ Laravel migrate"
+            php artisan migrate --force
+
+            echo "🧹 Clear & optimize"
             php artisan optimize:clear
             php artisan optimize
 
-            # 🔹 Redémarrer PHP-FPM
-            echo '🔁 Restart PHP-FPM'
-            sudo systemctl restart php8.2-fpm || echo '⚠️ PHP-FPM service not found, skipped'
+            echo "🔁 Restart PHP-FPM"
+            sudo systemctl restart php8.3-fpm || echo "⚠️ PHP-FPM not restarted"
 
-            echo '✅ Déploiement terminé'
-          "
+            echo "✅ Déploiement terminé"
+          EOF
