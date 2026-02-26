@@ -1,4 +1,4 @@
-name: Deploy Laravel Full CI/CD
+name: CI/CD Level 1
 
 on:
   workflow_dispatch:
