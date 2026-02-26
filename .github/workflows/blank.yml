@@ -1,4 +1,4 @@
-name: Deploy Laravel Simple
+name: Deploy Laravel Full CI/CD
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      # 🔹 3️⃣ Deploy
+      # 🔹 3️⃣ Deploy on VM
       - name: Deploy on VM
         run: |
           VM_USER="anasnadi"
@@ -28,44 +28,60 @@ jobs:
 
           echo "🔑 Connecting to $VM_USER@$VM_IP"
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << EOF
-            set -e
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'EOF'
+            set -e  # Stop workflow si une commande échoue
 
             echo "✅ Connecté au serveur"
 
+            # 🔹 Aller dans le projet
             if [ ! -d "$PROJECT_DIR" ]; then
               echo "❌ Dossier introuvable: $PROJECT_DIR"
               exit 1
             fi
+            cd "$PROJECT_DIR"
+            echo "📂 Current directory: $(pwd)"
 
-            cd $PROJECT_DIR
-            echo "📂 Current directory: \$(pwd)"
-
+            # 🔹 Vérifier PHP et Composer
             echo "🔎 PHP version"
             php -v
-
             echo "🔎 Composer version"
             composer -V
 
+            # 🔹 Pull du code
             echo "📥 Git pull"
             git fetch --all
             git reset --hard origin/main
 
+            # 🔹 Installer les dépendances
             echo "📦 Composer install"
             COMPOSER_MEMORY_LIMIT=-1 composer install \
               --no-interaction \
               --prefer-dist \
               --optimize-autoloader
 
+            # 🔹 Lancer le pre-commit hook via Composer
+            if [ -f ".git/hooks/pre-commit" ]; then
+              chmod +x .git/hooks/pre-commit
+              echo "🔧 Lancer le pre-commit hook via Composer"
+              composer run pre-commit || { echo "❌ Pre-commit hook échoué, arrêt du déploiement"; exit 1; }
+            fi
+
+            # 🔹 Lancer les tests Laravel
+            echo "🧪 Running Laravel tests"
+            php artisan test || { echo "❌ Tests Laravel échoués, arrêt du déploiement"; exit 1; }
+
+            # 🔹 Migrer la base
             echo "🗄️ Laravel migrate"
             php artisan migrate --force
 
+            # 🔹 Clear & optimize
             echo "🧹 Clear & optimize"
             php artisan optimize:clear
             php artisan optimize
 
+            # 🔹 Redémarrer PHP-FPM
             echo "🔁 Restart PHP-FPM"
             sudo systemctl restart php8.3-fpm || echo "⚠️ PHP-FPM not restarted"
 
             echo "✅ Déploiement terminé"
-          EOF
+EOF
