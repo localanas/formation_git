@@ -28,7 +28,7 @@ jobs:
 
           echo "🔑 Connecting to $VM_USER@$VM_IP"
 
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP bash << 'ENDSSH'
             set -e  # Stop workflow si une commande échoue
 
             echo "✅ Connecté au serveur"
